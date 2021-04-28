@@ -16,3 +16,7 @@ byteorder = "*"
 log = "*"
 env_logger = "*"
 enum_primitive = "*"
+
+[dependencies.sdl2]
+version = "0.34"
+features = ["bundled"]

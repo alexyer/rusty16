@@ -1,5 +1,6 @@
 use crate::enum_primitive::FromPrimitive;
 use crate::opcode::Opcode;
+use std::fmt;
 
 #[derive(Debug)]
 pub struct Instruction<'a>(pub &'a [u8]);
@@ -8,7 +9,7 @@ impl<'a> Instruction<'a> {
     #[inline(always)]
     pub fn opcode(&self) -> Opcode {
         Opcode::from_u8(self.0[0]).unwrap_or_else(|| {
-           panic!("Unrecognized opcode: {:#04x}. Instruction: {:#X?}", self.0[0], self.0)
+           panic!("Unrecognized opcode: {:#04x}. Instruction: {:X?}", self.0[0], self.0)
         })
     }
 
@@ -30,6 +31,19 @@ impl<'a> Instruction<'a> {
     #[inline(always)]
     pub fn hh(&self) -> u8 {
         self.0[3]
+    }
+}
+
+impl<'a> fmt::Display for Instruction<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(width) = f.width() {
+            write!(f, "{:width$}",
+                   format!("{: <4X}|{: <4X}|{: <4X}|{: <4X}",
+                           self.0[0], self.0[1], self.0[2], self.0[3]), width = width)
+        } else {
+            write!(f, "{: <4X}|{: <4X}|{: <4X}|{: <4X}",
+                self.0[0], self.0[1], self.0[2], self.0[3])
+        }
     }
 }
 
