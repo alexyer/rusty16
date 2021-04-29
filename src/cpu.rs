@@ -8,7 +8,7 @@ use enum_primitive::FromPrimitive;
 use crate::screen::Screen;
 use crate::surface::SdlSurface;
 
-const INSTRUCTION_SIZE: usize = 4;
+pub const INSTRUCTION_SIZE: usize = 4;
 const STACK_ENTRY_SIZE: usize = 2;
 
 pub struct Cpu {
@@ -27,8 +27,13 @@ impl Cpu {
 
     pub fn exec_instruction(&mut self, mem: &mut Memory, screen: &mut Screen<SdlSurface>) {
         let instruction = self.read_instruction(mem);
-        // println!("OP: {:<10} I: {:<15}, PC: {:#X?} SP: {:#X?} R: {:X?} F: {}", instruction.opcode(), instruction, self.pc, self.sp, self.r, self.flags);
-        match instruction.opcode() {
+        let opcode = instruction.opcode().unwrap_or_else(|| {
+           panic!("Unrecognized opcode: {:#04x}. Instruction: {:X?}", instruction.0[0], instruction.0)
+        });
+
+        // println!("OP: {:<10} I: {:<15}, PC: {:#04X?} SP: {:#X?} R: {:X?} F: {}", opcode, instruction.to_asm_str(), self.pc, self.sp, self.r, self.flags);
+
+        match opcode {
             Opcode::NOP => { self.inc_pc() },
             Opcode::VBLNK => { self.vblnk(screen) },
             Opcode::CLS => { screen.cls(); self.inc_pc() },

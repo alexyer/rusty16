@@ -45,6 +45,10 @@ impl Memory {
         }
     }
 
+    pub fn rom_size(&self) -> u32 {
+        LittleEndian::read_u32(&self.rom_header[6..=10])
+    }
+
     pub fn initial_pc(&self) -> u16 {
         LittleEndian::read_u16(&self.rom_header[10..13])
     }

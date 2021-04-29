@@ -11,10 +11,10 @@ use std::time::Duration;
 #[macro_use]
 mod macros;
 
-mod cpu;
+pub mod cpu;
 mod flags;
-mod instruction;
-mod memory;
+pub mod instruction;
+pub mod memory;
 mod opcode;
 mod screen;
 mod surface;

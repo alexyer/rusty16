@@ -11,6 +11,10 @@ path = "src/lib.rs"
 name = "rusty16"
 path = "src/bin.rs"
 
+[[bin]]
+name = "rusty16-dis"
+path = "src/dis.rs"
+
 [dependencies]
 byteorder = "*"
 log = "*"
