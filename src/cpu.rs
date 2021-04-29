@@ -29,7 +29,8 @@ impl Cpu {
         let instruction = self.read_instruction(mem);
         // println!("OP: {:<10} I: {:<15}, PC: {:#X?} SP: {:#X?} R: {:X?} F: {}", instruction.opcode(), instruction, self.pc, self.sp, self.r, self.flags);
         match instruction.opcode() {
-            Opcode::NOP=> { self.inc_pc() },
+            Opcode::NOP => { self.inc_pc() },
+            Opcode::VBLNK => { self.vblnk(screen) },
             Opcode::CLS => { screen.cls(); self.inc_pc() },
             Opcode::BGC => { screen.bgc(instruction.z()); self.inc_pc() },
             Opcode::SPR => { screen.spr(instruction.ll() as u8, instruction.hh() as u8); self.inc_pc() },
@@ -69,6 +70,13 @@ impl Cpu {
 
     fn read_instruction<'a>(&self, mem: &'a mut Memory) -> Instruction<'a> {
         Instruction(mem[self.pc as usize..self.pc as usize + INSTRUCTION_SIZE ].try_into().expect(""))
+    }
+
+    fn vblnk(&mut self, screen: &mut Screen<SdlSurface>) {
+        if screen.vblank() {
+            screen.clear_vblank();
+            self.inc_pc();
+        }
     }
 
     fn drw(&mut self, x: u8, y: u8, ll: u8, hh: u8, mem: &Memory, screen: &mut Screen<SdlSurface>) {

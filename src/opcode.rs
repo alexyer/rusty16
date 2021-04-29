@@ -5,6 +5,7 @@ enum_from_primitive! {
         // 0x - Misc/Video/Audio
         NOP = 0x00,
         CLS = 0x01,
+        VBLNK = 0x02,
         BGC = 0x03,
         SPR = 0x04,
         DRW_XY_HHLL = 0x05,

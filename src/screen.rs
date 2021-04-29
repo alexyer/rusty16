@@ -13,6 +13,7 @@ pub struct Screen<T: Surface> {
     spritew: u8,
     spriteh: u8,
     bg: Color,
+    vblank: bool,
 }
 
 impl<T: Surface> Screen<T> {
@@ -23,6 +24,7 @@ impl<T: Surface> Screen<T> {
             spritew: 0,
             spriteh: 0,
             bg: Color::Transparent,
+            vblank: false,
         }
     }
 
@@ -31,9 +33,22 @@ impl<T: Surface> Screen<T> {
         self.surface.init();
     }
 
+    pub fn set_vblank(&mut self) {
+        self.vblank = true;
+    }
+
+    pub fn clear_vblank(&mut self) {
+        self.vblank = false;
+    }
+
+    pub fn vblank(&self) -> bool {
+        self.vblank
+    }
+
     pub fn update_frame(&mut self) {
         self.surface.update_frame();
         self.surface.present(&self.buffer);
+        self.set_vblank();
     }
 
     pub fn cls(&mut self) {
@@ -51,8 +66,19 @@ impl<T: Surface> Screen<T> {
 
     // TODO (alexyer): Implement boundary checks and flips
     pub fn drw(&mut self, x: i16, y: i16, mut src: u16, mem: &Memory) {
-        for j in y as usize..(y as u8 + self.spriteh) as usize {
-            for i in (x as usize..(x as u8 + self.spritew*2) as usize).step_by(2) {
+        let mut spritew = self.spritew.wrapping_mul(2);
+        let mut spriteh = self.spritew;
+
+        if spritew >= SCREEN_WIDTH as u8 {
+            spritew -= 1;
+        }
+
+        if spriteh >= SCREEN_HEIGHT as u8 {
+            spriteh -= 1;
+        }
+
+        for j in y as usize..(y as u8 + spriteh) as usize {
+            for i in (x as usize..(x as u8 + spritew) as usize).step_by(2) {
                 self.buffer[i+1][j] = mem[src as usize] & 0x0f;
                 self.buffer[i][j] = (mem[src as usize] & 0xf0) >> 4;
                 src += 1;
