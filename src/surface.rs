@@ -77,20 +77,17 @@ impl Surface for SdlSurface {
     fn present(&mut self, buffer: &[[u8; SCREEN_HEIGHT]; SCREEN_WIDTH]) {
         for i in 0..SCREEN_WIDTH {
             for j in 0..SCREEN_HEIGHT {
-                // let rgb = Color::from_u8(buffer[i][j]).unwrap().rgb();
-                // println!("{:X}", rgb);
-                // let r = ((rgb & 0xff0000) >> 16) as u8;
-                // let g = ((rgb & 0x00ff00) >> 8) as u8;
-                // let b = ((rgb & 0x0000ff) as u8);
+                let rgb = Color::from_u8(buffer[i][j]).unwrap_or_else(
+                    || {
+                        panic!("Unknown Color: {:X}", buffer[i][j])
+                    }
+                ).rgb();
+                let r = ((rgb & 0xff0000) >> 16) as u8;
+                let g = ((rgb & 0x00ff00) >> 8) as u8;
+                let b = (rgb & 0x0000ff) as u8;
 
-                if buffer[i][j] != 0 {
-                    self.canvas.set_draw_color(pixels::Color::WHITE);
-                } else {
-                    self.canvas.set_draw_color(pixels::Color::BLACK);
-                }
-                // self.canvas.set_draw_color(pixels::Color::RGB(0, 0, 0))
+                self.canvas.set_draw_color(pixels::Color::RGB(r, g, b));
                 self.canvas.draw_point(Point::new(i as i32, j as i32));
-                // self.canvas.pixel(i as i16, j as i16, Color::from_u8(buffer[i+j]).rgb());
             }
         }
         self.canvas.present();

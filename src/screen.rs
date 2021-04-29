@@ -44,10 +44,11 @@ impl<T: Surface> Screen<T> {
     }
 
     // TODO (alexyer): Implement boundary checks and flips
-    pub fn drw(&mut self, x: u8, y: u8, mut src: u16, mem: &Memory) {
-        for i in x as usize..(x + self.spriteh) as usize {
-            for j in y as usize..(y + self.spritew) as usize {
-                self.buffer[i][j] = mem[src as usize];
+    pub fn drw(&mut self, x: i16, y: i16, mut src: u16, mem: &Memory) {
+        for j in y as usize..(y as u8 + self.spriteh) as usize {
+            for i in (x as usize..(x as u8 + self.spritew*2) as usize).step_by(2) {
+                self.buffer[i+1][j] = mem[src as usize] & 0x0f;
+                self.buffer[i][j] = (mem[src as usize] & 0xf0) >> 4;
                 src += 1;
             }
         }
@@ -56,7 +57,7 @@ impl<T: Surface> Screen<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::screen::Screen;
+    use crate::screen::{Screen, SCREEN_WIDTH, SCREEN_HEIGHT};
     use crate::surface::TestSurface;
     use crate::memory::Memory;
 
@@ -77,19 +78,22 @@ mod tests {
     #[test]
     fn test_drw() {
         let mut screen = Screen::<TestSurface>::new();
-        screen.spriteh = 2;
-        screen.spritew = 2;
+        screen.spriteh = 3;
+        screen.spritew = 1;
 
         let mut mem = Memory::default();
-        mem[42] = 0xff;
-        mem[43] = 0xfe;
-        mem[44] = 0xfd;
-        mem[45] = 0xfc;
+        mem[42] = 0xba;
+        mem[43] = 0xdc;
+        mem[44] = 0xfe;
 
         screen.drw(3, 4, 42, &mem);
-        assert_eq!(screen.buffer[3][4], 0xff);
-        assert_eq!(screen.buffer[3][5], 0xfe);
-        assert_eq!(screen.buffer[4][4], 0xfd);
-        assert_eq!(screen.buffer[4][5], 0xfc);
+
+
+        assert_eq!(screen.buffer[3][4], 0x0b);
+        assert_eq!(screen.buffer[4][4], 0x0a);
+        assert_eq!(screen.buffer[3][5], 0x0d);
+        assert_eq!(screen.buffer[4][5], 0x0c);
+        assert_eq!(screen.buffer[3][6], 0x0f);
+        assert_eq!(screen.buffer[4][6], 0x0e);
     }
 }

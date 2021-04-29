@@ -56,7 +56,7 @@ impl Cpu {
     }
 
     fn drw(&mut self, x: u8, y: u8, ll: u8, hh: u8, mem: &Memory, screen: &mut Screen<SdlSurface>) {
-        screen.drw(x, y, little_endian!(ll, hh), mem);
+        screen.drw(self.r[x as usize], self.r[y as usize], little_endian!(ll, hh), mem);
     }
 
     #[inline(always)]
