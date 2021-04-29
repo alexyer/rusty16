@@ -31,8 +31,11 @@ impl Cpu {
         match instruction.opcode() {
             Opcode::NOP=> { self.inc_pc() },
             Opcode::CLS => { screen.cls(); self.inc_pc() },
+            Opcode::BGC => { screen.bgc(instruction.z()); self.inc_pc() },
             Opcode::SPR => { screen.spr(instruction.ll() as u8, instruction.hh() as u8); self.inc_pc() },
-            Opcode::DRW_XY_HHLL => { self.drw(instruction.x(), instruction.y(), instruction.ll(), instruction.hh(), &mem, screen); self.inc_pc() },
+            Opcode::DRW_XY_HHLL => { self.drw(instruction.x(), instruction.y(), instruction.ll(), instruction.hh(), &mem, screen) },
+            Opcode::DRW_XYZ => { self.drw_xyz(instruction.x(), instruction.y(), instruction.z(), &mem, screen); self.inc_pc() },
+            Opcode::SND2 => { debug!("Unimplemented instruction SND2"); self.inc_pc() },
             Opcode::LDI => self.ldi(instruction.x() as usize, instruction.ll(), instruction.hh()),
             Opcode::CALL_HHLL => self.call_hhll(instruction.ll(), instruction.hh(), mem),
             Opcode::LDM_R => self.ldm_r(instruction.x(), instruction.y(), mem),
@@ -48,6 +51,19 @@ impl Cpu {
             Opcode::STM => self.stm(instruction.x(), instruction.ll(), instruction.hh(), mem),
             Opcode::STM_XY => self.stm_xy(instruction.x(), instruction.y(), mem),
             Opcode::AND_XY => self.and_xy(instruction.x(), instruction.y()),
+            Opcode::MOV => self.mov(instruction.x(), instruction.y()),
+            Opcode::TSTI => self.tsti(instruction.x(), instruction.ll(), instruction.hh()),
+            Opcode::DIV_XY => self.div_xy(instruction.x(), instruction.y()),
+            Opcode::MUL_XY => self.mul_xy(instruction.x(), instruction.y()),
+            Opcode::MUL_XYZ => self.mul_xyz(instruction.x(), instruction.y(), instruction.z()),
+            Opcode::XOR_XY => self.xor_xy(instruction.x(), instruction.y()),
+            Opcode::OR_XY => self.or_xy(instruction.x(), instruction.y()),
+            Opcode::SUB_XY => self.sub_xy(instruction.x(), instruction.y()),
+            Opcode::CMPI => self.cmpi(instruction.x(), instruction.ll(), instruction.hh()),
+            Opcode::PUSHF => self.pushf(mem),
+            Opcode::POP => self.pop(instruction.x(), mem),
+            Opcode::SHR => self.shr(instruction.x(), instruction.z()),
+            Opcode::SHL => self.shl(instruction.x(), instruction.z()),
         };
     }
 
@@ -57,6 +73,12 @@ impl Cpu {
 
     fn drw(&mut self, x: u8, y: u8, ll: u8, hh: u8, mem: &Memory, screen: &mut Screen<SdlSurface>) {
         screen.drw(self.r[x as usize], self.r[y as usize], little_endian!(ll, hh), mem);
+        self.inc_pc();
+    }
+
+    fn drw_xyz(&mut self, x: u8, y: u8, z: u8, mem: &Memory, screen: &mut Screen<SdlSurface>) {
+        screen.drw(self.r[x as usize], self.r[y as usize],self.r[z as usize] as u16, mem);
+        self.inc_pc();
     }
 
     #[inline(always)]
@@ -116,6 +138,11 @@ impl Cpu {
         }
     }
 
+    fn mov(&mut self, x: u8, y: u8) {
+        self.r[x as usize] = self.r[y as usize];
+        self.inc_pc();
+    }
+
     fn ldm_r(&mut self, x: u8, y: u8, mem: &mut Memory) {
         let src = (self.r[y as usize] as u16 & 0xffff) as usize;
         let res_ll = mem[src];
@@ -158,41 +185,75 @@ impl Cpu {
         and
     }
 
-    #[inline(always)]
+    fn tsti(&mut self, x: u8, ll: u8, hh: u8) {
+        self.and_op(self.r[x as usize], little_endian!(ll, hh) as i16);
+        self.inc_pc();
+    }
+
     fn andi(&mut self, x: u8, ll: u8, hh: u8) {
         self.r[x as usize] = self.and_op(self.r[x as usize], little_endian!(ll, hh) as i16);
         self.inc_pc();
     }
 
-    #[inline(always)]
     fn and_xy(&mut self, x: u8, y: u8) {
         self.r[x as usize] = self.and_op(self.r[x as usize], self.r[y as usize]);
         self.inc_pc();
     }
 
-    fn subi(&mut self, x: u8, ll: u8, hh: u8) {
-        let prev_val = self.r[x as usize];
-        let sub = little_endian!(ll, hh) as i16;
+    fn sub_op(&mut self, a: i16, b: i16) -> i16 {
+        let sub = a.wrapping_sub(b);
 
-        let new_val = prev_val.wrapping_sub(sub);
+        self.flags.check_n(sub);
+        self.flags.check_z(sub);
 
-        self.r[x as usize] = new_val;
-
-        self.flags.check_n(new_val);
-        self.flags.check_z(new_val);
-
-        if (prev_val as u16) < (sub as u16) {
+        if (a as u16) < (sub as u16) {
             self.flags.set_c();
         } else {
             self.flags.clear_c();
         }
 
-        if (new_val > 0 && prev_val < 0 && sub > 0) || (new_val < 0 && prev_val > 0 && sub < 0) {
+        if (sub > 0 && a < 0 && sub > 0) || (sub < 0 && a > 0 && sub < 0) {
             self.flags.set_o();
         } else {
             self.flags.clear_o();
         }
 
+        sub
+    }
+
+    fn subi(&mut self, x: u8, ll: u8, hh: u8) {
+        self.r[x as usize] = self.sub_op(self.r[x as usize], little_endian!(ll, hh) as i16);
+        self.inc_pc();
+    }
+
+    fn cmpi(&mut self, x: u8, ll: u8, hh: u8) {
+        self.sub_op(self.r[x as usize], little_endian!(ll, hh) as i16);
+        self.inc_pc();
+    }
+
+    fn sub_xy(&mut self, x: u8, y: u8) {
+        self.r[x as usize] = self.sub_op(self.r[x as usize], self.r[y as usize]);
+        self.inc_pc();
+    }
+
+    fn div_op(&mut self, a: i16, b: i16) -> i16 {
+        let div = a.wrapping_div(b);
+        let rem = a.wrapping_rem(b);
+
+        if rem != 0 {
+            self.flags.set_c();
+        } else {
+            self.flags.clear_c();
+        }
+
+        self.flags.check_n(div);
+        self.flags.check_z(div);
+
+        div
+    }
+
+    fn div_xy(&mut self, x: u8, y: u8) {
+        self.r[x as usize] = self.div_op(self.r[x as usize], self.r[y as usize]);
         self.inc_pc();
     }
 
@@ -227,22 +288,105 @@ impl Cpu {
         self.inc_pc();
     }
 
-    fn muli(&mut self, x: u8, ll: u8, hh: u8) {
-        let prev_val = self.r[x as usize];
-        let mul = little_endian!(ll, hh) as u16;
-        let new_val: u32 = prev_val as u32 * mul as u32;
+    fn mul_op(&mut self, a: i16, b: i16) -> i16 {
+        let a = a as u32 & 0xffff;
+        let b = b as u32 & 0xffff;
+        let mul = a * b;
 
-        self.r[x as usize] = new_val as i16;
+        self.flags.check_z(mul as i16);
+        self.flags.check_n(mul as i16);
 
-        self.flags.check_z(new_val as i16);
-        self.flags.check_n(new_val as i16);
-
-        if new_val > 0xffff {
+        if mul > 0xffff {
             self.flags.set_c();
         } else {
             self.flags.clear_c();
         }
 
+        mul as i16
+    }
+
+    fn muli(&mut self, x: u8, ll: u8, hh: u8) {
+        self.r[x as usize] = self.mul_op(self.r[x as usize], little_endian!(ll, hh) as i16);
+        self.inc_pc();
+    }
+
+    fn mul_xy(&mut self, x: u8, y: u8) {
+        self.r[x as usize] = self.mul_op(self.r[x as usize], self.r[y as usize]);
+        self.inc_pc();
+    }
+
+    fn mul_xyz(&mut self, x: u8, y: u8, z: u8) {
+        self.r[z as usize] = self.mul_op(self.r[x as usize], self.r[y as usize]);
+        self.inc_pc();
+    }
+
+    fn xor_op(&mut self, a: i16, b: i16) -> i16 {
+        let xor = a ^ b;
+
+        self.flags.check_z(xor);
+        self.flags.check_n(xor);
+
+        xor
+    }
+
+    fn xor_xy(&mut self, x: u8, y: u8) {
+        self.r[x as usize] = self.xor_op(self.r[x as usize], self.r[y as usize]);
+        self.inc_pc();
+    }
+
+    fn or_op(&mut self, a: i16, b: i16) -> i16 {
+        let or = a | b;
+
+        self.flags.check_z(or);
+        self.flags.check_n(or);
+
+        or
+    }
+
+    fn or_xy(&mut self, x: u8, y: u8) {
+        self.r[x as usize] = self.or_op(self.r[x as usize], self.r[y as usize]);
+        self.inc_pc();
+    }
+
+    fn pushf(&mut self, mem: &mut Memory) {
+        mem[self.sp as usize] = self.flags.into();
+        mem[self.sp as usize + 1] = 0;
+        self.inc_sp();
+        self.inc_pc();
+    }
+
+    fn pop(&mut self, x: u8, mem: &mut Memory) {
+        self.dec_sp();
+        let addr = self.sp as usize;
+        self.r[x as usize] = (((mem[addr + 1] as u16) << 8) | mem[addr] as u16) as i16;
+        self.inc_pc();
+    }
+
+    fn shr_op(&mut self, x: i16, n: u8) -> i16 {
+        let shr = x.wrapping_shr(n as u32);
+
+        self.flags.check_n(shr);
+        self.flags.check_z(shr);
+
+        shr
+    }
+
+    fn shr(&mut self, x: u8, n: u8) {
+        self.r[x as usize] = self.shr_op(self.r[x as usize], n);
+        self.inc_pc();
+    }
+
+    fn shl_op(&mut self, x: i16, n: u8) -> i16 {
+        let shl = x.wrapping_shl(n as u32);
+
+        self.flags.check_n(shl);
+        self.flags.check_z(shl);
+
+        shl
+    }
+
+    fn shl(&mut self, x: u8, n: u8) {
+        self.r[x as usize] = self.shl_op(self.r[x as usize], n);
         self.inc_pc();
     }
 }
@@ -376,6 +520,16 @@ mod tests {
     }
 
     #[test]
+    fn test_mov() {
+        let mut cpu = Cpu::default();
+        cpu.r[0] = 0;
+        cpu.r[13] = 42;
+
+        cpu.mov(0, 13);
+        assert_eq!(cpu.r[0], 42);
+    }
+
+    #[test]
     fn test_ldm_hhll() {
         let mut cpu = Cpu::default();
         let mut mem = Memory::default();
@@ -384,6 +538,16 @@ mod tests {
         mem[0xfffb] = 0xde;
         cpu.ldm_hhll(0, 0xfa, 0xff, &mut mem);
         assert_eq!(cpu.r[0], -8531);
+    }
+
+    #[test]
+    fn test_tsti() {
+        let mut cpu = Cpu::default();
+
+        cpu.r[0] = 42;
+        cpu.tsti(0, 0x00, 0x00);
+        assert_eq!(cpu.r[0], 42);
+        assert!(cpu.flags.z());
     }
 
     #[test]
@@ -506,5 +670,158 @@ mod tests {
         assert!(cpu.flags.z());
         assert!(!cpu.flags.n());
         assert!(!cpu.flags.c());
+    }
+
+    #[test]
+    fn test_mul_xyz() {
+        let mut cpu = Cpu::default();
+
+        cpu.r[0] = 2;
+        cpu.r[1] = 2;
+        cpu.mul_xyz(0, 1, 2);
+        assert_eq!(cpu.r[2], 4);
+    }
+
+    #[test]
+    fn test_div_xy() {
+        let mut cpu = Cpu::default();
+        cpu.r[0] = 6;
+        cpu.r[1] = 2;
+
+        cpu.div_xy(0, 1);
+        assert_eq!(cpu.r[0], 3);
+        assert!(!cpu.flags.c());
+        assert!(!cpu.flags.z());
+        assert!(!cpu.flags.n());
+
+        cpu.r[0] = 5;
+        cpu.r[1] = 3;
+        cpu.div_xy(0, 1);
+        assert_eq!(cpu.r[0], 1);
+        assert!(cpu.flags.c());
+        assert!(!cpu.flags.z());
+        assert!(!cpu.flags.n());
+
+        cpu.r[0] = -5;
+        cpu.r[1] = 3;
+        cpu.div_xy(0, 1);
+        assert_eq!(cpu.r[0], -1);
+        assert!(cpu.flags.c());
+        assert!(!cpu.flags.z());
+        assert!(cpu.flags.n());
+    }
+
+    #[test]
+    fn test_xor_xy() {
+        let mut cpu = Cpu::default();
+        cpu.r[0] = 0xa;
+        cpu.r[1] = 0xf;
+
+        cpu.xor_xy(0, 1);
+        assert_eq!(cpu.r[0], 0x5);
+        assert!(!cpu.flags.z());
+        assert!(!cpu.flags.n());
+
+        cpu.r[0] = 0xa;
+        cpu.r[1] = 0xa;
+
+        cpu.xor_xy(0, 1);
+        assert_eq!(cpu.r[0], 0);
+        assert!(cpu.flags.z());
+        assert!(!cpu.flags.n());
+
+        cpu.r[0] = 0xa;
+        cpu.r[1] = -10;
+
+        cpu.xor_xy(0, 1);
+        assert_eq!(cpu.r[0], -4);
+        assert!(!cpu.flags.z());
+        assert!(cpu.flags.n());
+    }
+
+    #[test]
+    fn test_pushf() {
+        let mut cpu = Cpu::default();
+        let mut mem = Memory::default();
+
+        cpu.flags.set_c();
+        cpu.flags.set_o();
+        cpu.flags.set_z();
+        cpu.flags.set_n();
+
+        let old_sp = cpu.sp;
+        cpu.pushf(&mut mem);
+
+        assert_eq!(cpu.sp, old_sp + STACK_ENTRY_SIZE as u16);
+        assert_eq!(mem[old_sp as usize], 0b11000110);
+    }
+
+    #[test]
+    fn test_pop() {
+        let mut cpu = Cpu::default();
+        let mut mem = Memory::default();
+        mem[cpu.sp as usize] = 0xad;
+        mem[cpu.sp as usize + 1] = 0xde;
+        cpu.sp += STACK_ENTRY_SIZE as u16;
+
+        cpu.pop(0, &mut mem);
+        assert_eq!(cpu.r[0], -8531);
+    }
+
+    #[test]
+    fn test_shr() {
+        let mut cpu = Cpu::default();
+        cpu.r[0] = 4;
+
+        cpu.shr(0, 2);
+        assert_eq!(cpu.r[0], 1);
+        assert!(!cpu.flags.n());
+        assert!(!cpu.flags.z());
+
+        cpu.shr(0, 1);
+        assert_eq!(cpu.r[0], 0);
+        assert!(!cpu.flags.n());
+        assert!(cpu.flags.z());
+    }
+
+    #[test]
+    fn test_shl() {
+        let mut cpu = Cpu::default();
+        cpu.r[0] = 1;
+
+        cpu.shl(0, 2);
+        assert_eq!(cpu.r[0], 4);
+        assert!(!cpu.flags.n());
+        assert!(!cpu.flags.z());
+
+        cpu.shl(0, 13);
+        assert_eq!(cpu.r[0], -32768);
+        assert!(cpu.flags.n());
+        assert!(!cpu.flags.z());
+
+        cpu.shl(0, 1);
+        assert_eq!(cpu.r[0], 0);
+        assert!(!cpu.flags.n());
+        assert!(cpu.flags.z());
+    }
+
+    #[test]
+    fn test_or_xy() {
+        let mut cpu = Cpu::default();
+        cpu.r[0] = 0xa;
+        cpu.r[1] = 0xf;
+
+        cpu.or_xy(0, 1);
+        assert_eq!(cpu.r[0], 0xff);
+        assert!(!cpu.flags.z());
+        assert!(!cpu.flags.n());
+
+        cpu.r[0] = 0xa;
+        cpu.r[1] = 0xa;
+
+        cpu.or_xy(0, 1);
+        assert_eq!(cpu.r[0], 0xa);
+        assert!(!cpu.flags.z());
+        assert!(!cpu.flags.n());
     }
 }

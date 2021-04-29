@@ -5,8 +5,11 @@ enum_from_primitive! {
         // 0x - Misc/Video/Audio
         NOP = 0x00,
         CLS = 0x01,
+        BGC = 0x03,
         SPR = 0x04,
         DRW_XY_HHLL = 0x05,
+        DRW_XYZ = 0x06,
+        SND2 = 0x0b,
 
         // 1x - Jumps
         JMP = 0x10,
@@ -18,6 +21,7 @@ enum_from_primitive! {
         LDI = 0x20,
         LDM_HHLL = 0x22,
         LDM_R = 0x23,
+        MOV = 0x24,
 
         // 3x - Stores
         STM = 0x30,
@@ -29,13 +33,35 @@ enum_from_primitive! {
 
         // 5x - Subtraction
         SUBI = 0x50,
+        SUB_XY = 0x51,
+        CMPI = 0x53,
 
         // 6x - Bitwise AND (&)
         ANDI = 0x60,
         AND_XY = 0x61,
+        TSTI = 0x63,
+
+        // 7x - Bitwise OR
+        OR_XY = 0x71,
+
+        // 8x - Bitwise XOR (^)
+        XOR_XY = 0x81,
 
         // 9x - Multiplication
         MULI = 0x90,
+        MUL_XY = 0x91,
+        MUL_XYZ = 0x92,
+
+        // Ax - Division
+        DIV_XY = 0xa1,
+
+        // Bx - Logical/Arithmetic Shifts
+        SHL = 0xb0,
+        SHR = 0xb1,
+
+        // Cx - Push/Pop
+        POP = 0xc1,
+        PUSHF = 0xc4,
     }
 }
 

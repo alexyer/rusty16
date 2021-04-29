@@ -24,6 +24,11 @@ impl<'a> Instruction<'a> {
     }
 
     #[inline(always)]
+    pub fn z(&self) -> u8 {
+        self.0[2] & 0x0f
+    }
+
+    #[inline(always)]
     pub fn ll(&self) -> u8 {
         self.0[2]
     }

@@ -1,5 +1,7 @@
-use crate::surface::Surface;
+use crate::surface::{Surface, Color};
 use crate::memory::Memory;
+use enum_primitive::FromPrimitive;
+use std::panic::panic_any;
 
 pub const SCREEN_WIDTH: usize = 320;
 pub const SCREEN_HEIGHT: usize = 240;
@@ -10,6 +12,7 @@ pub struct Screen<T: Surface> {
     buffer: [[u8; SCREEN_HEIGHT]; SCREEN_WIDTH],
     spritew: u8,
     spriteh: u8,
+    bg: Color,
 }
 
 impl<T: Surface> Screen<T> {
@@ -19,6 +22,7 @@ impl<T: Surface> Screen<T> {
             buffer: [[0; SCREEN_HEIGHT]; SCREEN_WIDTH],
             spritew: 0,
             spriteh: 0,
+            bg: Color::Transparent,
         }
     }
 
@@ -36,6 +40,8 @@ impl<T: Surface> Screen<T> {
         for pixel in self.buffer.iter_mut().flat_map(|i| i.iter_mut()) {
             *pixel = 0;
         }
+
+        self.surface.cls(&self.bg);
     }
 
     pub fn spr(&mut self, w: u8, h: u8) {
@@ -52,6 +58,14 @@ impl<T: Surface> Screen<T> {
                 src += 1;
             }
         }
+    }
+
+    pub fn bgc(&mut self, n: u8) {
+        self.bg = Color::from_u8(n).unwrap_or_else(|| {
+           panic!("Unknown Color: {:X}", n);
+        });
+        self.surface.cls(&self.bg);
+        self.update_frame();
     }
 }
 

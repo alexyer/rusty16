@@ -4,7 +4,6 @@
 extern crate enum_primitive;
 extern crate sdl2;
 use log::info;
-use std::io::stdin;
 use crate::surface::SdlSurface;
 use std::thread;
 use std::time::Duration;

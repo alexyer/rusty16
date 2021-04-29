@@ -1,6 +1,6 @@
 use std::fmt;
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Copy, Clone)]
 pub struct CpuFlags(pub u8);
 
 macro_rules! flag {
@@ -68,5 +68,11 @@ mod tests {
 
         flags.check_z(0);
         assert!(flags.z());
+    }
+}
+
+impl Into<u8> for CpuFlags {
+    fn into(self) -> u8 {
+        self.0
     }
 }
