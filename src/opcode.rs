@@ -12,6 +12,7 @@ enum_from_primitive! {
         DRW_XYZ = 0x06,
         RND = 0x07,
         SND2 = 0x0b,
+        SND3 = 0x0c,
         SNP = 0x0d,
         SNG = 0x0e,
 

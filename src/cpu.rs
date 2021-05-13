@@ -43,6 +43,7 @@ impl Cpu {
             Opcode::DRW_XY_HHLL => { self.drw(instruction.x(), instruction.y(), instruction.ll(), instruction.hh(), &mem, screen) },
             Opcode::DRW_XYZ => { self.drw_xyz(instruction.x(), instruction.y(), instruction.z(), &mem, screen) },
             Opcode::SND2 => { debug!("Unimplemented instruction SND2"); self.inc_pc() },
+            Opcode::SND3 => { debug!("Unimplemented instruction SND3"); self.inc_pc() },
             Opcode::SNG => { debug!("Unimplemented instruction SNG"); self.inc_pc() },
             Opcode::SNP => { debug!("Unimplemented instruction SNP"); self.inc_pc() },
             Opcode::LDI => self.ldi(instruction.x() as usize, instruction.ll(), instruction.hh()),
