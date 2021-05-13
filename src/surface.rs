@@ -11,7 +11,7 @@ pub trait Surface {
     fn init(&mut self);
     fn cls(&mut self, bg: &Color);
     fn update_frame(&mut self);
-    fn present(&mut self, buffer: &[[u8; SCREEN_HEIGHT]; SCREEN_WIDTH]);
+    fn present(&mut self, buffer: &[[u8; SCREEN_WIDTH]; SCREEN_HEIGHT]);
 }
 
 pub struct TestSurface;
@@ -27,7 +27,7 @@ impl Surface for TestSurface {
     fn init(&mut self) {}
     fn cls(&mut self, bg: &Color) {}
     fn update_frame(&mut self) {}
-    fn present(&mut self, buffer: &[[u8; SCREEN_HEIGHT]; SCREEN_WIDTH]) {}
+    fn present(&mut self, buffer: &[[u8; SCREEN_WIDTH]; SCREEN_HEIGHT]) {}
 }
 
 impl Surface for SdlSurface {
@@ -79,11 +79,11 @@ impl Surface for SdlSurface {
         }
     }
 
-    fn present(&mut self, buffer: &[[u8; SCREEN_HEIGHT]; SCREEN_WIDTH]) {
-        for i in 0..SCREEN_WIDTH {
-            for j in 0..SCREEN_HEIGHT {
-                let (r, g, b) =  Color::from_u8(buffer[i][j]).unwrap_or_else(
-                    || { panic!("Unknown Color: {:X}", buffer[i][j]) }
+    fn present(&mut self, buffer: &[[u8; SCREEN_WIDTH]; SCREEN_HEIGHT]) {
+        for j in 0..SCREEN_HEIGHT {
+            for i in 0..SCREEN_WIDTH {
+                let (r, g, b) =  Color::from_u8(buffer[j][i]).unwrap_or_else(
+                    || { panic!("Unknown Color: {:X}", buffer[j][i]) }
                 ).to_tuple();
 
                 self.canvas.set_draw_color(pixels::Color::RGB(r, g, b));

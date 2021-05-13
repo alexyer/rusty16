@@ -9,7 +9,7 @@ pub const SCREEN_HEIGHT: usize = 240;
 pub struct Screen<T: Surface> {
     surface: T,
 
-    buffer: [[u8; SCREEN_HEIGHT]; SCREEN_WIDTH],
+    buffer: [[u8; SCREEN_WIDTH]; SCREEN_HEIGHT],
     spritew: u8,
     spriteh: u8,
     bg: Color,
@@ -20,7 +20,7 @@ impl<T: Surface> Screen<T> {
     pub fn new() -> Screen<T> {
         Screen{
             surface: T::new(),
-            buffer: [[0; SCREEN_HEIGHT]; SCREEN_WIDTH],
+            buffer: [[0; SCREEN_WIDTH]; SCREEN_HEIGHT],
             spritew: 0,
             spriteh: 0,
             bg: Color::Transparent,
@@ -66,21 +66,27 @@ impl<T: Surface> Screen<T> {
 
     // TODO (alexyer): Implement boundary checks and flips
     pub fn drw(&mut self, x: i16, y: i16, mut src: u16, mem: &Memory) {
-        let mut spritew = self.spritew.wrapping_mul(2);
-        let mut spriteh = self.spritew;
 
-        if spritew >= SCREEN_WIDTH as u8 {
+
+        let mut spritew = self.spritew.wrapping_mul(2) as u16;
+        let mut spriteh = self.spriteh as u16;
+
+        if spritew >= SCREEN_WIDTH as u16 {
             spritew -= 1;
         }
 
-        if spriteh >= SCREEN_HEIGHT as u8 {
+        if spriteh >= SCREEN_HEIGHT as u16 {
             spriteh -= 1;
         }
 
-        for j in y as usize..(y as u8 + spriteh) as usize {
-            for i in (x as usize..(x as u8 + spritew) as usize).step_by(2) {
-                self.buffer[i+1][j] = mem[src as usize] & 0x0f;
-                self.buffer[i][j] = (mem[src as usize] & 0xf0) >> 4;
+        for j in (y as usize..(y as u16 + spriteh) as usize) {
+            for i in (x as usize..(x as u16 + spritew) as usize).step_by(2) {
+                if i + 1 >= SCREEN_WIDTH || j >= SCREEN_HEIGHT {
+                    continue;
+                }
+
+                self.buffer[j][i+1] = mem[src as usize] & 0x0f;
+                self.buffer[j][i] = (mem[src as usize] & 0xf0) >> 4;
                 src += 1;
             }
         }
@@ -128,6 +134,16 @@ mod tests {
 
         screen.drw(3, 4, 42, &mem);
 
+        for i in 0..SCREEN_WIDTH {
+            for j in 0..SCREEN_HEIGHT {
+                if screen.buffer[i][j] != 0 {
+                    print!("{:X}", screen.buffer[i][j]);
+                } else {
+                    print!(".");
+                }
+            }
+            print!("\n");
+        }
 
         assert_eq!(screen.buffer[3][4], 0x0b);
         assert_eq!(screen.buffer[4][4], 0x0a);

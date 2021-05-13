@@ -47,6 +47,7 @@ impl<'a> Instruction<'a> {
             Some(Opcode::DRW_XYZ) => format!("DRW R{:01X}, R{:01X}, R{:01X}", self.x(), self.y(), self.z()),
             Some(Opcode::SND2) => format!("SND2 {:02X}{:02X}", self.hh(), self.ll()),
             Some(Opcode::JMP) => format!("JMP {:02X}{:02X}", self.hh(), self.ll()),
+            Some(Opcode::JME) => format!("JME R{:01X}, R{:01X}, {:02X}{:02X}", self.x(), self.y(), self.hh(), self.ll()),
             Some(Opcode::JX) => {
                 let opcode = match self.x() {
                     0x0 => "JZ",
@@ -89,11 +90,14 @@ impl<'a> Instruction<'a> {
             Some(Opcode::OR_XY) => format!("OR R{:01X}, R{:01X}", self.x(), self.y()),
             Some(Opcode::XOR_XY) => format!("XOR R{:01X}, R{:01X}", self.x(), self.y()),
             Some(Opcode::MULI) => format!("MULI R{:01X}, {:02X}{:02X}", self.x(), self.hh(), self.ll()),
+            Some(Opcode::RND) => format!("RND R{:01X}, {:02X}{:02X}", self.x(), self.hh(), self.ll()),
             Some(Opcode::MUL_XY) => format!("MUL R{:01X}, R{:01X}", self.x(), self.y()),
+            Some(Opcode::CMP) => format!("CMP R{:01X}, R{:01X}", self.x(), self.y()),
             Some(Opcode::MUL_XYZ) => format!("MUL R{:01X}, R{:01X}, R{:01X}", self.x(), self.y(), self.z()),
             Some(Opcode::DIV_XY) => format!("DIV R{:01X}, R{:01X}", self.x(), self.y()),
             Some(Opcode::SHL) => format!("SHL R{:01X}, R{:01X}", self.x(), self.z()),
-            Some(Opcode::SHR) => format!("SHR R{:01X}, R{:01X}", self.x(), self.z()),
+            Some(Opcode::SAR) => format!("SAR R{:01X}, {:01X}", self.x(), self.z()),
+            Some(Opcode::SHR) => format!("SHR R{:01X}, {:01X}", self.x(), self.z()),
             Some(Opcode::POP) => format!("POP R{:01X}", self.x()),
             Some(Opcode::PUSHF) => format!("PUSHF"),
             _ => String::from("??")

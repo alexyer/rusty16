@@ -10,11 +10,15 @@ enum_from_primitive! {
         SPR = 0x04,
         DRW_XY_HHLL = 0x05,
         DRW_XYZ = 0x06,
+        RND = 0x07,
         SND2 = 0x0b,
+        SNP = 0x0d,
+        SNG = 0x0e,
 
         // 1x - Jumps
         JMP = 0x10,
         JX = 0x12,
+        JME = 0x13,
         CALL_HHLL = 0x14,
         RET = 0x15,
 
@@ -31,19 +35,24 @@ enum_from_primitive! {
         // 4x - Addition
         ADDI = 0x40,
         ADD_XY = 0x41,
+        ADD_XYZ = 0x42,
 
         // 5x - Subtraction
         SUBI = 0x50,
         SUB_XY = 0x51,
+        SUB_XYZ = 0x52,
         CMPI = 0x53,
+        CMP = 0x54,
 
         // 6x - Bitwise AND (&)
         ANDI = 0x60,
         AND_XY = 0x61,
         TSTI = 0x63,
+        TST = 0x64,
 
         // 7x - Bitwise OR
         OR_XY = 0x71,
+        OR_XYZ = 0x72,
 
         // 8x - Bitwise XOR (^)
         XOR_XY = 0x81,
@@ -59,8 +68,11 @@ enum_from_primitive! {
         // Bx - Logical/Arithmetic Shifts
         SHL = 0xb0,
         SHR = 0xb1,
+        SAR = 0xb2,
+        SHL_XY = 0xb3,
 
         // Cx - Push/Pop
+        PUSH = 0xc0,
         POP = 0xc1,
         PUSHF = 0xc4,
     }
@@ -80,6 +92,10 @@ enum_from_primitive! {
     #[derive(Debug)]
     pub enum JMP_TYPE {
         Z = 0x0,
+        NZ = 0x1,
         B = 0x9,
+        BE = 0xa,
+        GE = 0xc,
+        LE = 0xe,
     }
 }

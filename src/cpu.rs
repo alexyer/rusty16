@@ -7,6 +7,7 @@ use crate::flags::CpuFlags;
 use enum_primitive::FromPrimitive;
 use crate::screen::Screen;
 use crate::surface::SdlSurface;
+use rand::Rng;
 
 pub const INSTRUCTION_SIZE: usize = 4;
 const STACK_ENTRY_SIZE: usize = 2;
@@ -40,8 +41,10 @@ impl Cpu {
             Opcode::BGC => { screen.bgc(instruction.z()); self.inc_pc() },
             Opcode::SPR => { screen.spr(instruction.ll() as u8, instruction.hh() as u8); self.inc_pc() },
             Opcode::DRW_XY_HHLL => { self.drw(instruction.x(), instruction.y(), instruction.ll(), instruction.hh(), &mem, screen) },
-            Opcode::DRW_XYZ => { self.drw_xyz(instruction.x(), instruction.y(), instruction.z(), &mem, screen); self.inc_pc() },
+            Opcode::DRW_XYZ => { self.drw_xyz(instruction.x(), instruction.y(), instruction.z(), &mem, screen) },
             Opcode::SND2 => { debug!("Unimplemented instruction SND2"); self.inc_pc() },
+            Opcode::SNG => { debug!("Unimplemented instruction SNG"); self.inc_pc() },
+            Opcode::SNP => { debug!("Unimplemented instruction SNP"); self.inc_pc() },
             Opcode::LDI => self.ldi(instruction.x() as usize, instruction.ll(), instruction.hh()),
             Opcode::CALL_HHLL => self.call_hhll(instruction.ll(), instruction.hh(), mem),
             Opcode::LDM_R => self.ldm_r(instruction.x(), instruction.y(), mem),
@@ -49,32 +52,48 @@ impl Cpu {
             Opcode::ANDI => self.andi(instruction.x(), instruction.ll(), instruction.hh()),
             Opcode::JMP => self.jmp(instruction.ll(), instruction.hh()),
             Opcode::JX => self.jx(instruction.x(), instruction.ll(), instruction.hh()),
+            Opcode::JME => self.jme(instruction.x(), instruction.y(), instruction.ll(), instruction.hh()),
             Opcode::RET => self.ret(mem),
             Opcode::SUBI => self.subi(instruction.x(), instruction.ll(), instruction.hh()),
             Opcode::MULI => self.muli(instruction.x(), instruction.ll(), instruction.hh()),
             Opcode::ADDI => self.addi(instruction.x(), instruction.ll(), instruction.hh()),
             Opcode::ADD_XY => self.add_xy(instruction.x(), instruction.y()),
+            Opcode::ADD_XYZ => self.add_xyz(instruction.x(), instruction.y(), instruction.z()),
             Opcode::STM => self.stm(instruction.x(), instruction.ll(), instruction.hh(), mem),
             Opcode::STM_XY => self.stm_xy(instruction.x(), instruction.y(), mem),
             Opcode::AND_XY => self.and_xy(instruction.x(), instruction.y()),
             Opcode::MOV => self.mov(instruction.x(), instruction.y()),
             Opcode::TSTI => self.tsti(instruction.x(), instruction.ll(), instruction.hh()),
+            Opcode::TST => self.tst(instruction.x(), instruction.y()),
             Opcode::DIV_XY => self.div_xy(instruction.x(), instruction.y()),
             Opcode::MUL_XY => self.mul_xy(instruction.x(), instruction.y()),
             Opcode::MUL_XYZ => self.mul_xyz(instruction.x(), instruction.y(), instruction.z()),
             Opcode::XOR_XY => self.xor_xy(instruction.x(), instruction.y()),
             Opcode::OR_XY => self.or_xy(instruction.x(), instruction.y()),
+            Opcode::OR_XYZ => self.or_xyz(instruction.x(), instruction.y(), instruction.z()),
             Opcode::SUB_XY => self.sub_xy(instruction.x(), instruction.y()),
+            Opcode::SUB_XYZ => self.sub_xyz(instruction.x(), instruction.y(), instruction.z()),
             Opcode::CMPI => self.cmpi(instruction.x(), instruction.ll(), instruction.hh()),
+            Opcode::CMP => self.cmp(instruction.x(), instruction.y()),
             Opcode::PUSHF => self.pushf(mem),
+            Opcode::PUSH => self.push(instruction.x(), mem),
             Opcode::POP => self.pop(instruction.x(), mem),
             Opcode::SHR => self.shr(instruction.x(), instruction.z()),
             Opcode::SHL => self.shl(instruction.x(), instruction.z()),
+            Opcode::SHL_XY => self.shl_xy(instruction.x(), instruction.y()),
+            Opcode::RND => self.rnd(instruction.x(), instruction.ll(), instruction.hh()),
+            Opcode::SAR => self.sar(instruction.x(), instruction.z()),
         };
     }
 
     fn read_instruction<'a>(&self, mem: &'a mut Memory) -> Instruction<'a> {
         Instruction(mem[self.pc as usize..self.pc as usize + INSTRUCTION_SIZE ].try_into().expect(""))
+    }
+
+    fn rnd(&mut self, x: u8, ll: u8, hh: u8) {
+        let mut rng = rand::thread_rng();
+        self.r[x as usize] = rng.gen_range(0..=little_endian!(ll, hh)) as i16;
+        self.inc_pc();
     }
 
     fn vblnk(&mut self, screen: &mut Screen<SdlSurface>) {
@@ -140,6 +159,15 @@ impl Cpu {
     }
 
     #[inline(always)]
+    fn jme(&mut self, x: u8, y: u8, ll: u8, hh: u8) {
+        if self.r[x as usize] == self.r[y as usize] {
+            self.pc = little_endian!(ll, hh) as u16;
+        } else {
+            self.inc_pc()
+        }
+    }
+
+    #[inline(always)]
     fn jx(&mut self, x: u8, ll: u8, hh: u8) {
         let jmp_type = JMP_TYPE::from_u8(x).unwrap_or_else(|| {
            panic!("Unrecognized JMP Type: {:#04x}", x);
@@ -147,7 +175,11 @@ impl Cpu {
 
         match jmp_type {
             JMP_TYPE::Z => if self.flags.z() { self.jmp(ll, hh) } else { self.inc_pc() },
+            JMP_TYPE::NZ => if !self.flags.z() { self.jmp(ll, hh) } else { self.inc_pc() },
             JMP_TYPE::B => if self.flags.c() { self.jmp(ll, hh) } else { self.inc_pc() },
+            JMP_TYPE::BE => if self.flags.c() || self.flags.z() { self.jmp(ll, hh) } else { self.inc_pc() },
+            JMP_TYPE::LE => if self.flags.z() || self.flags.n() { self.jmp(ll,  hh) } else { self.inc_pc() },
+            JMP_TYPE::GE => if !self.flags.n() { self.jmp(ll,  hh) } else { self.inc_pc() },
         }
     }
 
@@ -203,6 +235,11 @@ impl Cpu {
         self.inc_pc();
     }
 
+    fn tst(&mut self, x: u8, y: u8) {
+        self.and_op(self.r[x as usize], self.r[y as usize]);
+        self.inc_pc();
+    }
+
     fn andi(&mut self, x: u8, ll: u8, hh: u8) {
         self.r[x as usize] = self.and_op(self.r[x as usize], little_endian!(ll, hh) as i16);
         self.inc_pc();
@@ -239,9 +276,20 @@ impl Cpu {
         self.inc_pc();
     }
 
+    fn sub_xyz(&mut self, x: u8, y: u8, z: u8) {
+        self.r[z as usize] = self.sub_op(self.r[x as usize], self.r[y as usize]);
+        self.inc_pc();
+    }
+
     fn cmpi(&mut self, x: u8, ll: u8, hh: u8) {
         self.sub_op(self.r[x as usize], little_endian!(ll, hh) as i16);
         self.inc_pc();
+    }
+
+    fn cmp(&mut self, x: u8, y: u8) {
+        self.sub_op(self.r[x as usize], self.r[y as usize]);
+        self.inc_pc();
+
     }
 
     fn sub_xy(&mut self, x: u8, y: u8) {
@@ -298,6 +346,11 @@ impl Cpu {
 
     fn add_xy(&mut self, x: u8, y: u8) {
         self.r[x as usize] = self.add_op(self.r[x as usize], self.r[y as usize]);
+        self.inc_pc();
+    }
+
+    fn add_xyz(&mut self, x: u8, y: u8, z: u8) {
+        self.r[z as usize] = self.add_op(self.r[x as usize], self.r[y as usize]);
         self.inc_pc();
     }
 
@@ -361,6 +414,11 @@ impl Cpu {
         self.inc_pc();
     }
 
+    fn or_xyz(&mut self, x: u8, y: u8, z: u8) {
+        self.r[z as usize] = self.or_op(self.r[x as usize], self.r[y as usize]);
+        self.inc_pc();
+    }
+
     fn pushf(&mut self, mem: &mut Memory) {
         mem[self.sp as usize] = self.flags.into();
         mem[self.sp as usize + 1] = 0;
@@ -372,6 +430,17 @@ impl Cpu {
         self.dec_sp();
         let addr = self.sp as usize;
         self.r[x as usize] = (((mem[addr + 1] as u16) << 8) | mem[addr] as u16) as i16;
+        self.inc_pc();
+    }
+
+    fn push(&mut self, x: u8, mem: &mut Memory) {
+        let addr = self.sp as usize;
+        let val = self.r[x as usize] as u16;
+
+        mem[addr] = (val & 0x00ff) as u8;
+        mem[addr + 1] = (val & 0xff00 >> 8) as u8;
+
+        self.inc_sp();
         self.inc_pc();
     }
 
@@ -389,6 +458,13 @@ impl Cpu {
         self.inc_pc();
     }
 
+    fn sar(&mut self, x: u8, n: u8) {
+        let old = self.r[x as usize];
+        let new = self.shr_op(self.r[x as usize], n) as u16;
+        self.r[x as usize] = (new | (new & 0x8000)) as i16;
+        self.inc_pc()
+    }
+
     fn shl_op(&mut self, x: i16, n: u8) -> i16 {
         let shl = x.wrapping_shl(n as u32);
 
@@ -400,6 +476,12 @@ impl Cpu {
 
     fn shl(&mut self, x: u8, n: u8) {
         self.r[x as usize] = self.shl_op(self.r[x as usize], n);
+        self.inc_pc();
+    }
+
+    // TODO(alexyer): Investigate if RY is signed.
+    fn shl_xy(&mut self, x: u8, y: u8) {
+        self.r[x as usize] = self.shl_op(self.r[x as usize], self.r[y as usize] as u8);
         self.inc_pc();
     }
 }
@@ -515,6 +597,61 @@ mod tests {
 
         cpu.flags.set_z();
         cpu.jx(0,0xad, 0xde);
+        assert_eq!(cpu.pc, 0xdead);
+
+        let mut cpu = Cpu::default();
+
+        cpu.pc = 0xffee;
+        cpu.jx(0xe,0xad, 0xde);
+        assert_eq!(cpu.pc, 0xffee + INSTRUCTION_SIZE as u16);
+
+        cpu.flags.set_n();
+        cpu.jx(0xe,0xad, 0xde);
+        assert_eq!(cpu.pc, 0xdead);
+    }
+
+    #[test]
+    fn test_jle() {
+        let mut cpu = Cpu::default();
+
+        cpu.pc = 0xffee;
+        cpu.jx(0xe,0xad, 0xde);
+        assert_eq!(cpu.pc, 0xffee + INSTRUCTION_SIZE as u16);
+
+        cpu.flags.set_z();
+        cpu.jx(0xe,0xad, 0xde);
+        assert_eq!(cpu.pc, 0xdead);
+    }
+
+    #[test]
+    fn test_jge() {
+        let mut cpu = Cpu::default();
+
+        cpu.pc = 0xffee;
+        cpu.flags.set_n();
+        cpu.jx(0xc,0xad, 0xde);
+        assert_eq!(cpu.pc, 0xffee + INSTRUCTION_SIZE as u16);
+
+        cpu.pc = 0xffee;
+        cpu.flags.clear_n();
+        cpu.pc = 0xffee;
+        cpu.jx(0xc,0xad, 0xde);
+        assert_eq!(cpu.pc, 0xdead);
+
+    }
+
+    #[test]
+    fn test_jme() {
+        let mut cpu = Cpu::default();
+        cpu.pc = 0xfff0;
+        cpu.r[0] = 0;
+        cpu.r[1] = 1;
+
+        cpu.jme(0, 1, 0xed, 0xda);
+        assert_eq!(cpu.pc, 0xfff4);
+
+        cpu.r[0] = 1;
+        cpu.jme(0, 1, 0xad, 0xde);
         assert_eq!(cpu.pc, 0xdead);
     }
 
@@ -782,6 +919,16 @@ mod tests {
     }
 
     #[test]
+    fn test_push() {
+        let mut cpu = Cpu::default();
+        let mut mem = Memory::default();
+        cpu.r[0] = 42;
+
+        cpu.push(0, &mut mem);
+        assert_eq!(mem[cpu.sp as usize - STACK_ENTRY_SIZE], 42);
+    }
+
+    #[test]
     fn test_shr() {
         let mut cpu = Cpu::default();
         cpu.r[0] = 4;
@@ -795,6 +942,19 @@ mod tests {
         assert_eq!(cpu.r[0], 0);
         assert!(!cpu.flags.n());
         assert!(cpu.flags.z());
+    }
+
+    #[test]
+    fn test_sar() {
+        let mut cpu = Cpu::default();
+        cpu.r[0] = -32767;
+
+        cpu.sar(0, 1);
+        assert_eq!(cpu.r[0], -16384 as i16);
+
+        cpu.r[0] = 4;
+        cpu.sar(0, 1);
+        assert_eq!(cpu.r[0], 2);
     }
 
     #[test]
@@ -825,7 +985,7 @@ mod tests {
         cpu.r[1] = 0xf;
 
         cpu.or_xy(0, 1);
-        assert_eq!(cpu.r[0], 0xff);
+        assert_eq!(cpu.r[0], 0xf);
         assert!(!cpu.flags.z());
         assert!(!cpu.flags.n());
 
