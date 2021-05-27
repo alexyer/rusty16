@@ -25,3 +25,7 @@ rand = "*"
 [dependencies.sdl2]
 version = "0.34"
 features = ["bundled"]
+
+[profile.release]
+debug = true
+opt-level = 3

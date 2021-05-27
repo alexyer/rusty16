@@ -1,23 +1,30 @@
 use sdl2::{pixels, EventPump};
-use sdl2::render::WindowCanvas;
+use sdl2::render::{WindowCanvas, Texture, TextureCreator, TextureAccess};
 use crate::screen::{SCREEN_WIDTH, SCREEN_HEIGHT};
 use enum_primitive::FromPrimitive;
-use sdl2::rect::Point;
-use sdl2::pixels::PixelFormat;
+use sdl2::rect::{Point, Rect};
+use sdl2::pixels::{PixelFormat, PixelFormatEnum};
+use std::borrow::Borrow;
+use sdl2::video::WindowContext;
+use std::cell::RefCell;
+use sdl2::event::EventType;
 
 // FIXME: better name
 pub trait Surface {
     fn new() -> Self;
     fn init(&mut self);
     fn cls(&mut self, bg: &Color);
-    fn update_frame(&mut self);
+    fn poll_events(&mut self);
     fn present(&mut self, buffer: &[[u8; SCREEN_WIDTH]; SCREEN_HEIGHT]);
 }
 
 pub struct TestSurface;
-pub struct SdlSurface {
+pub struct SdlSurface{
     canvas: WindowCanvas,
     events: EventPump,
+    buffer: Vec<u32>,
+    creator: TextureCreator<sdl2::video::WindowContext>,
+    texture: RefCell<Texture<'static>>,
 }
 
 impl Surface for TestSurface {
@@ -26,19 +33,22 @@ impl Surface for TestSurface {
     }
     fn init(&mut self) {}
     fn cls(&mut self, bg: &Color) {}
-    fn update_frame(&mut self) {}
+    fn poll_events(&mut self) {}
     fn present(&mut self, buffer: &[[u8; SCREEN_WIDTH]; SCREEN_HEIGHT]) {}
 }
 
 impl Surface for SdlSurface {
     fn new() -> Self {
+        let width = SCREEN_WIDTH as u32;
+        let height = SCREEN_HEIGHT as u32;
+
         let sdl_context = sdl2::init().unwrap();
         let video_subsys = sdl_context.video().unwrap();
         let window = video_subsys
             .window(
                 "Rusty16",
-                SCREEN_WIDTH as u32,
-                SCREEN_HEIGHT as u32,
+                width as u32,
+                height as u32,
             )
             .position_centered()
             .opengl()
@@ -47,15 +57,30 @@ impl Surface for SdlSurface {
 
         let mut canvas = window
             .into_canvas()
+            .accelerated()
             .build()
             .map_err(|e| e.to_string())
             .unwrap();
 
         let mut events = sdl_context.event_pump().unwrap();
+        events.disable_event(EventType::MouseButtonDown);
+        events.disable_event(EventType::MouseButtonUp);
+        events.disable_event(EventType::MouseMotion);
+
+        let creator = canvas.texture_creator();
+        let texture = creator.create_texture(
+            PixelFormatEnum::ARGB8888, TextureAccess::Streaming, width, height).unwrap();
+
+        let texture = unsafe{
+            std::mem::transmute::<_,Texture<'static>>(texture)
+        };
 
         SdlSurface {
             canvas,
             events,
+            buffer: vec![0; SCREEN_WIDTH * SCREEN_HEIGHT * 4],
+            creator,
+            texture: RefCell::new(texture),
         }
     }
 
@@ -67,53 +92,61 @@ impl Surface for SdlSurface {
     }
 
     fn cls(&mut self, bg: &Color) {
-        let (r, g, b) = bg.to_tuple();
-        self.canvas.set_draw_color(pixels::Color::RGB(r, g, b));
+        let (r, g, b, a) = bg.to_tuple();
+        self.canvas.set_draw_color(pixels::Color::RGBA(r, g, b, a));
+        self.canvas.clear();
+        self.canvas.present();
     }
 
-    fn update_frame(&mut self) {
+    fn poll_events(&mut self) {
         for event in self.events.poll_iter() {
             match event {
-                _ => {}
+                _ => ()
             }
         }
     }
 
-    fn present(&mut self, buffer: &[[u8; SCREEN_WIDTH]; SCREEN_HEIGHT]) {
-        for j in 0..SCREEN_HEIGHT {
-            for i in 0..SCREEN_WIDTH {
-                let (r, g, b) =  Color::from_u8(buffer[j][i]).unwrap_or_else(
-                    || { panic!("Unknown Color: {:X}", buffer[j][i]) }
-                ).to_tuple();
+    fn present(&mut self, new_buffer: &[[u8; SCREEN_WIDTH]; SCREEN_HEIGHT]) {
+        let mut texture = self.texture.borrow_mut();
+        texture.with_lock(None, |buffer, pitch| {
+           for j in 0..SCREEN_HEIGHT {
+               for i in 0..SCREEN_WIDTH {
+                   let (r, g, b, a) = Color::from_u8(new_buffer[j][i]).to_tuple();
+                   let offset = j * pitch + i * 4;
+                   buffer[offset] = b;
+                   buffer[offset + 1] = g;
+                   buffer[offset + 2] = r;
+                   buffer[offset + 3] = a;
+               }
+           }
+        });
 
-                self.canvas.set_draw_color(pixels::Color::RGB(r, g, b));
-                self.canvas.draw_point(Point::new(i as i32, j as i32));
-            }
-        }
+        self.canvas.clear();
+        self.canvas.copy(&texture, None, None);
         self.canvas.present();
     }
 }
 
 // TODO (alexyer): Support dynamic palette
-enum_from_primitive! {
-    pub enum Color {
-        Transparent = 0x0,
-        Black = 0x1,
-        Gray = 0x2,
-        Red = 0x3,
-        Pink = 0x4,
-        DarkBrown = 0x5,
-        Brown = 0x6,
-        Orange = 0x7,
-        Yellow = 0x8,
-        Green = 0x9,
-        LightGreen = 0xa,
-        DarkBlue = 0xb,
-        Blue = 0xc,
-        LightBlue = 0xd,
-        SkyBlue = 0xe,
-        White = 0xf,
-    }
+#[derive(Copy, Clone)]
+pub enum Color {
+    Transparent = 0x0,
+    Black = 0x1,
+    Gray = 0x2,
+    Red = 0x3,
+    Pink = 0x4,
+    DarkBrown = 0x5,
+    Brown = 0x6,
+    Orange = 0x7,
+    Yellow = 0x8,
+    Green = 0x9,
+    LightGreen = 0xa,
+    DarkBlue = 0xb,
+    Blue = 0xc,
+    LightBlue = 0xd,
+    SkyBlue = 0xe,
+    White = 0xf,
+    Unknown = 0xff,
 }
 
 impl Color {
@@ -135,17 +168,75 @@ impl Color {
             Color::LightBlue => 0x68abcc,
             Color::SkyBlue => 0xbcdee4,
             Color::White => 0xffffff,
-
+            Color::Unknown => 0x0
         }
     }
 
-    pub fn to_tuple(&self) -> (u8, u8, u8) {
+    pub fn argb(&self) -> u32 {
+        match self {
+            Color::Transparent | Color::Unknown => 0x0,
+            _ => (0xff << 24) | self.rgb(),
+        }
+    }
+
+    pub fn to_tuple(&self) -> (u8, u8, u8, u8) {
         let rgb = self.rgb();
 
         let r = ((rgb & 0xff0000) >> 16) as u8;
         let g = ((rgb & 0x00ff00) >> 8) as u8;
         let b = (rgb & 0x0000ff) as u8;
 
-        (r, g, b)
+        let a = match self {
+            Color::Transparent => 0,
+            _ => 0xff
+        };
+
+        (r, g, b, a)
+    }
+
+    pub fn from_u8(i: u8) -> Self {
+        match i {
+            0x0 => Color::Transparent,
+            0x1 => Color::Black,
+            0x2 => Color::Gray,
+            0x3 => Color::Red,
+            0x4 => Color::Pink,
+            0x5 => Color::DarkBrown,
+            0x6 => Color::Brown,
+            0x7 => Color::Orange,
+            0x8 => Color::Yellow,
+            0x9 => Color::Green,
+            0xa => Color::LightGreen,
+            0xb => Color::DarkBlue,
+            0xc => Color::Blue,
+            0xd => Color::LightBlue,
+            0xe => Color::SkyBlue,
+            0xf => Color::White,
+            _ => Color::Unknown,
+        }
+    }
+}
+
+impl Into<u8> for Color {
+    fn into(self) -> u8 {
+        match self {
+            Color::Transparent => 0x0,
+            Color::Black => 0x1,
+            Color::Gray => 0x2,
+            Color::Red => 0x3,
+            Color::Pink => 0x4,
+            Color::DarkBrown => 0x5,
+            Color::Brown => 0x6,
+            Color::Orange => 0x7,
+            Color::Yellow => 0x8,
+            Color::Green => 0x9,
+            Color::LightGreen => 0xa,
+            Color::DarkBlue => 0xb,
+            Color::Blue => 0xc,
+            Color::LightBlue => 0xd,
+            Color::SkyBlue => 0xe,
+            Color::White => 0xf,
+            Color::Unknown => 0x0,
+        }
     }
 }

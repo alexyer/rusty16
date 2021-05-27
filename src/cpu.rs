@@ -177,6 +177,8 @@ impl Cpu {
         match jmp_type {
             JMP_TYPE::Z => if self.flags.z() { self.jmp(ll, hh) } else { self.inc_pc() },
             JMP_TYPE::NZ => if !self.flags.z() { self.jmp(ll, hh) } else { self.inc_pc() },
+            JMP_TYPE::A => if !self.flags.c() && !self.flags.z() { self.jmp(ll, hh) } else { self.inc_pc() },
+            JMP_TYPE::AE => if !self.flags.c() { self.jmp(ll, hh) } else { self.inc_pc() },
             JMP_TYPE::B => if self.flags.c() { self.jmp(ll, hh) } else { self.inc_pc() },
             JMP_TYPE::BE => if self.flags.c() || self.flags.z() { self.jmp(ll, hh) } else { self.inc_pc() },
             JMP_TYPE::LE => if self.flags.z() || self.flags.n() { self.jmp(ll,  hh) } else { self.inc_pc() },

@@ -14,6 +14,7 @@ pub struct Screen<T: Surface> {
     spriteh: u8,
     bg: Color,
     vblank: bool,
+    updated: bool,
 }
 
 impl<T: Surface> Screen<T> {
@@ -25,6 +26,7 @@ impl<T: Surface> Screen<T> {
             spriteh: 0,
             bg: Color::Transparent,
             vblank: false,
+            updated: false,
         }
     }
 
@@ -45,15 +47,21 @@ impl<T: Surface> Screen<T> {
         self.vblank
     }
 
+    pub fn poll_events(&mut self) {
+        self.surface.poll_events();
+    }
+
     pub fn update_frame(&mut self) {
-        self.surface.update_frame();
-        self.surface.present(&self.buffer);
+        if self.updated {
+            self.surface.present(&self.buffer);
+            self.updated = false;
+        }
         self.set_vblank();
     }
 
     pub fn cls(&mut self) {
         for pixel in self.buffer.iter_mut().flat_map(|i| i.iter_mut()) {
-            *pixel = 0;
+            *pixel = self.bg.into();
         }
 
         self.surface.cls(&self.bg);
@@ -66,7 +74,7 @@ impl<T: Surface> Screen<T> {
 
     // TODO (alexyer): Implement boundary checks and flips
     pub fn drw(&mut self, x: i16, y: i16, mut src: u16, mem: &Memory) {
-
+        self.updated = true;
 
         let mut spritew = self.spritew.wrapping_mul(2) as u16;
         let mut spriteh = self.spriteh as u16;
@@ -79,13 +87,13 @@ impl<T: Surface> Screen<T> {
             spriteh -= 1;
         }
 
-        for j in (y as usize..(y as u16 + spriteh) as usize) {
+        for j in y as usize..(y as u16 + spriteh) as usize {
             for i in (x as usize..(x as u16 + spritew) as usize).step_by(2) {
                 if i + 1 >= SCREEN_WIDTH || j >= SCREEN_HEIGHT {
                     continue;
                 }
 
-                self.buffer[j][i+1] = mem[src as usize] & 0x0f;
+                self.buffer[j][i + 1] = mem[src as usize] & 0x0f;
                 self.buffer[j][i] = (mem[src as usize] & 0xf0) >> 4;
                 src += 1;
             }
@@ -93,9 +101,7 @@ impl<T: Surface> Screen<T> {
     }
 
     pub fn bgc(&mut self, n: u8) {
-        self.bg = Color::from_u8(n).unwrap_or_else(|| {
-           panic!("Unknown Color: {:X}", n);
-        });
+        self.bg = Color::from_u8(n);
         self.surface.cls(&self.bg);
         self.update_frame();
     }

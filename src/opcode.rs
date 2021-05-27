@@ -94,6 +94,8 @@ enum_from_primitive! {
     pub enum JMP_TYPE {
         Z = 0x0,
         NZ = 0x1,
+        A = 0x7,
+        AE = 0x8,
         B = 0x9,
         BE = 0xa,
         GE = 0xc,
