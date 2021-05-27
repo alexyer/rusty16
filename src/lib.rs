@@ -5,7 +5,7 @@ extern crate enum_primitive;
 extern crate sdl2;
 use log::info;
 use crate::surface::SdlSurface;
-use std::thread;
+use std::{thread, time};
 use std::time::Duration;
 
 #[macro_use]
@@ -55,14 +55,18 @@ impl<'a> Rusty16<'a> {
         self.screen.init();
 
         info!("Starting execution");
+
         loop {
             // TODO (alexyer):Implement proper timer.
-            for _ in 0..1666 {
-                self.step();
-                thread::sleep(Duration::from_micros(1));
+            let start = time::Instant::now();
+            while time::Instant::now().duration_since(start) < time::Duration::from_secs(1) {
+                let start_screen = time::Instant::now();
+                while time::Instant::now().duration_since(start_screen) < time::Duration::from_micros(16666) {
+                    self.step();
+                }
+                self.screen.poll_events();
+                self.screen.update_frame();
             }
-
-            self.screen.update_frame();
             // let mut s = String::new();
             // stdin().read_line(&mut s).unwrap();
         }
