@@ -46,6 +46,8 @@ impl<'a> Instruction<'a> {
             Some(Opcode::DRW_XY_HHLL) => format!("DRW R{:01X}, R{:01X}, {:02X}{:02X}", self.x(), self.y(), self.hh(), self.ll()),
             Some(Opcode::DRW_XYZ) => format!("DRW R{:01X}, R{:01X}, R{:01X}", self.x(), self.y(), self.z()),
             Some(Opcode::SND2) => format!("SND2 {:02X}{:02X}", self.hh(), self.ll()),
+            Some(Opcode::SND3) => format!("SND3 {:02X}{:02X}", self.hh(), self.ll()),
+            Some(Opcode::SNP) => format!("SNP R{:01X}, {:02X}{:02X}", self.x(), self.hh(), self.ll()),
             Some(Opcode::JMP) => format!("JMP {:02X}{:02X}", self.hh(), self.ll()),
             Some(Opcode::JME) => format!("JME R{:01X}, R{:01X}, {:02X}{:02X}", self.x(), self.y(), self.hh(), self.ll()),
             Some(Opcode::JX) => {
@@ -73,6 +75,7 @@ impl<'a> Instruction<'a> {
             },
             Some(Opcode::CALL_HHLL) => format!("CALL {:02X}{:02X}", self.hh(), self.ll()),
             Some(Opcode::RET) => format!("RET"),
+            Some(Opcode::CALL) => format!("CALL R{:01X}", self.x()),
             Some(Opcode::LDI) => format!("LDI R{:01X}, {:02X}{:02X}", self.x(), self.hh(), self.ll()),
             Some(Opcode::LDM_HHLL) => format!("LDM SP, {:02X}{:02X}", self.hh(), self.ll()),
             Some(Opcode::LDM_R) => format!("LDM R{:01X}, R{:01X}", self.x(), self.y()),
@@ -81,25 +84,34 @@ impl<'a> Instruction<'a> {
             Some(Opcode::STM_XY) => format!("STM R{:01X}, R{:01X}", self.x(), self.y()),
             Some(Opcode::ADDI) => format!("ADDI R{:01X}, {:02X}{:02X}", self.x(), self.hh(), self.ll()),
             Some(Opcode::ADD_XY) => format!("ADD R{:01X}, R{:01X}", self.x(), self.y()),
+            Some(Opcode::ADD_XYZ) => format!("ADD R{:01X}, R{:01X}, R{:01X}", self.x(), self.y(), self.z()),
             Some(Opcode::SUBI) => format!("SUBI R{:01X}, {:02X}{:02X}", self.x(), self.hh(), self.ll()),
             Some(Opcode::SUB_XY) => format!("SUB R{:01X}, R{:01X}", self.x(), self.y()),
+            Some(Opcode::SUB_XYZ) => format!("SUB R{:01X}, R{:01X}, R{:01X}", self.x(), self.y(), self.z()),
             Some(Opcode::CMPI) => format!("CMPI R{:01X}, {:02X}{:02X}", self.x(), self.hh(), self.ll()),
+            Some(Opcode::CMP) => format!("CMP R{:01X}, R{:01X}", self.x(), self.y()),
             Some(Opcode::ANDI) => format!("ANDI R{:01X}, {:02X}{:02X}", self.x(), self.hh(), self.ll()),
             Some(Opcode::AND_XY) => format!("AND R{:01X}, R{:01X}", self.x(), self.y()),
             Some(Opcode::TSTI) => format!("TSTI R{:01X}, {:02X}{:02X}", self.x(), self.hh(), self.ll()),
+            Some(Opcode::TST) => format!("TST R{:01X}, R{:01X}", self.x(), self.y()),
             Some(Opcode::OR_XY) => format!("OR R{:01X}, R{:01X}", self.x(), self.y()),
+            Some(Opcode::OR_XYZ) => format!("OR R{:01X}, R{:01X}, R{:01X}", self.x(), self.y(), self.z()),
             Some(Opcode::XOR_XY) => format!("XOR R{:01X}, R{:01X}", self.x(), self.y()),
+            Some(Opcode::XOR_XYZ) => format!("XOR R{:01X}, R{:01X}, R{:01X}", self.x(), self.y(), self.z()),
             Some(Opcode::MULI) => format!("MULI R{:01X}, {:02X}{:02X}", self.x(), self.hh(), self.ll()),
-            Some(Opcode::RND) => format!("RND R{:01X}, {:02X}{:02X}", self.x(), self.hh(), self.ll()),
             Some(Opcode::MUL_XY) => format!("MUL R{:01X}, R{:01X}", self.x(), self.y()),
-            Some(Opcode::CMP) => format!("CMP R{:01X}, R{:01X}", self.x(), self.y()),
             Some(Opcode::MUL_XYZ) => format!("MUL R{:01X}, R{:01X}, R{:01X}", self.x(), self.y(), self.z()),
+            Some(Opcode::DIVI) => format!("DIVI R{:01X}, {:02X}{:02X}", self.x(), self.hh(), self.ll()),
             Some(Opcode::DIV_XY) => format!("DIV R{:01X}, R{:01X}", self.x(), self.y()),
             Some(Opcode::SHL) => format!("SHL R{:01X}, R{:01X}", self.x(), self.z()),
-            Some(Opcode::SAR) => format!("SAR R{:01X}, {:01X}", self.x(), self.z()),
             Some(Opcode::SHR) => format!("SHR R{:01X}, {:01X}", self.x(), self.z()),
+            Some(Opcode::SAR) => format!("SAR R{:01X}, {:01X}", self.x(), self.z()),
+            Some(Opcode::SHL_XY) => format!("SHL R{:01X}, R{:01X}", self.x(), self.y()),
+            Some(Opcode::RND) => format!("RND R{:01X}, {:02X}{:02X}", self.x(), self.hh(), self.ll()),
+            Some(Opcode::PUSH) => format!("PUSH R{:01X}", self.x()),
             Some(Opcode::POP) => format!("POP R{:01X}", self.x()),
             Some(Opcode::PUSHF) => format!("PUSHF"),
+            Some(Opcode::PAL) => format!("PAL {:02X}{:02X}", self.hh(), self.ll()),
             _ => String::from("??")
         }
     }
@@ -146,6 +158,19 @@ mod tests {
 
         for case in cases {
             assert_eq!(case.0.y(), case.1);
+        }
+    }
+
+    #[test]
+    fn test_z() {
+        let cases = vec![
+            (Instruction(&[0x20, 0x10, 0x0a, 0x03]), 0x0a),
+            (Instruction(&[0x20, 0xf0, 0x0b, 0x03]), 0x0b),
+            (Instruction(&[0x20, 0x1f, 0x0c, 0x03]), 0x0c),
+        ];
+
+        for case in cases {
+            assert_eq!(case.0.z(), case.1);
         }
     }
 

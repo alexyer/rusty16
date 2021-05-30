@@ -32,7 +32,9 @@ impl Cpu {
            panic!("Unrecognized opcode: {:#04x}. Instruction: {:X?}", instruction.0[0], instruction.0)
         });
 
-        // println!("OP: {:<10} I: {:<15}, PC: {:#04X?} SP: {:#X?} R: {:X?} F: {}", opcode, instruction.to_asm_str(), self.pc, self.sp, self.r, self.flags);
+        // if opcode != Opcode::VBLNK {
+        //     println!("OP: {:<10} I: {:<15}, PC: {:#04X?} SP: {:#X?} R: {:X?} F: {}", opcode, instruction.to_asm_str(), self.pc, self.sp, self.r, self.flags);
+        // }
 
         match opcode {
             Opcode::NOP => { self.inc_pc() },
@@ -48,10 +50,11 @@ impl Cpu {
             Opcode::SNP => { debug!("Unimplemented instruction SNP"); self.inc_pc() },
             Opcode::LDI => self.ldi(instruction.x() as usize, instruction.ll(), instruction.hh()),
             Opcode::CALL_HHLL => self.call_hhll(instruction.ll(), instruction.hh(), mem),
+            Opcode::CALL => self.call(instruction.x(), mem),
             Opcode::LDM_R => self.ldm_r(instruction.x(), instruction.y(), mem),
             Opcode::LDM_HHLL => self.ldm_hhll(instruction.x(), instruction.ll(), instruction.hh(), mem),
             Opcode::ANDI => self.andi(instruction.x(), instruction.ll(), instruction.hh()),
-            Opcode::JMP => self.jmp(instruction.ll(), instruction.hh()),
+            Opcode::JMP => self.jmp(little_endian!(instruction.ll(), instruction.hh())),
             Opcode::JX => self.jx(instruction.x(), instruction.ll(), instruction.hh()),
             Opcode::JME => self.jme(instruction.x(), instruction.y(), instruction.ll(), instruction.hh()),
             Opcode::RET => self.ret(mem),
@@ -63,13 +66,16 @@ impl Cpu {
             Opcode::STM => self.stm(instruction.x(), instruction.ll(), instruction.hh(), mem),
             Opcode::STM_XY => self.stm_xy(instruction.x(), instruction.y(), mem),
             Opcode::AND_XY => self.and_xy(instruction.x(), instruction.y()),
+            Opcode::AND_XYZ => self.and_xyz(instruction.x(), instruction.y(), instruction.z()),
             Opcode::MOV => self.mov(instruction.x(), instruction.y()),
             Opcode::TSTI => self.tsti(instruction.x(), instruction.ll(), instruction.hh()),
             Opcode::TST => self.tst(instruction.x(), instruction.y()),
             Opcode::DIV_XY => self.div_xy(instruction.x(), instruction.y()),
+            Opcode::DIVI => self.divi(instruction.x(), instruction.ll(), instruction.hh()),
             Opcode::MUL_XY => self.mul_xy(instruction.x(), instruction.y()),
             Opcode::MUL_XYZ => self.mul_xyz(instruction.x(), instruction.y(), instruction.z()),
             Opcode::XOR_XY => self.xor_xy(instruction.x(), instruction.y()),
+            Opcode::XOR_XYZ => self.xor_xyz(instruction.x(), instruction.y(), instruction.z()),
             Opcode::OR_XY => self.or_xy(instruction.x(), instruction.y()),
             Opcode::OR_XYZ => self.or_xyz(instruction.x(), instruction.y(), instruction.z()),
             Opcode::SUB_XY => self.sub_xy(instruction.x(), instruction.y()),
@@ -84,6 +90,7 @@ impl Cpu {
             Opcode::SHL_XY => self.shl_xy(instruction.x(), instruction.y()),
             Opcode::RND => self.rnd(instruction.x(), instruction.ll(), instruction.hh()),
             Opcode::SAR => self.sar(instruction.x(), instruction.z()),
+            Opcode::PAL => { debug!("Unimplemented instruction PAL"); self.inc_pc() },
         };
     }
 
@@ -135,12 +142,18 @@ impl Cpu {
         self.inc_pc();
     }
 
-    #[inline(always)]
     fn call_hhll(&mut self, ll: u8, hh: u8, mem: &mut Memory) {
         mem[self.sp as usize] = (self.pc & 0x00ff) as u8;
         mem[self.sp as usize + 1] = (self.pc >> 8) as u8;
         self.inc_sp();
-        self.jmp(ll, hh);
+        self.jmp(little_endian!(ll, hh));
+    }
+
+    fn call(&mut self, x: u8, mem: &mut Memory) {
+        mem[self.sp as usize] = (self.pc & 0x00ff) as u8;
+        mem[self.sp as usize + 1] = (self.pc >> 8) as u8;
+        self.inc_sp();
+        self.jmp(self.r[x as usize] as u16);
     }
 
     #[inline(always)]
@@ -155,8 +168,8 @@ impl Cpu {
     }
 
     #[inline(always)]
-    fn jmp(&mut self, ll: u8, hh: u8) {
-        self.pc = little_endian!(ll, hh) as u16;
+    fn jmp(&mut self, addr: u16) {
+        self.pc = addr;
     }
 
     #[inline(always)]
@@ -175,14 +188,17 @@ impl Cpu {
         });
 
         match jmp_type {
-            JMP_TYPE::Z => if self.flags.z() { self.jmp(ll, hh) } else { self.inc_pc() },
-            JMP_TYPE::NZ => if !self.flags.z() { self.jmp(ll, hh) } else { self.inc_pc() },
-            JMP_TYPE::A => if !self.flags.c() && !self.flags.z() { self.jmp(ll, hh) } else { self.inc_pc() },
-            JMP_TYPE::AE => if !self.flags.c() { self.jmp(ll, hh) } else { self.inc_pc() },
-            JMP_TYPE::B => if self.flags.c() { self.jmp(ll, hh) } else { self.inc_pc() },
-            JMP_TYPE::BE => if self.flags.c() || self.flags.z() { self.jmp(ll, hh) } else { self.inc_pc() },
-            JMP_TYPE::LE => if self.flags.z() || self.flags.n() { self.jmp(ll,  hh) } else { self.inc_pc() },
-            JMP_TYPE::GE => if !self.flags.n() { self.jmp(ll,  hh) } else { self.inc_pc() },
+            JMP_TYPE::Z => if self.flags.z() { self.jmp(little_endian!(ll, hh)) } else { self.inc_pc() },
+            JMP_TYPE::NZ => if !self.flags.z() { self.jmp(little_endian!(ll, hh)) } else { self.inc_pc() },
+            JMP_TYPE::N => if self.flags.z() { self.jmp(little_endian!(ll, hh)) } else { self.inc_pc() },
+            JMP_TYPE::NN => if !self.flags.n() { self.jmp(little_endian!(ll, hh)) } else { self.inc_pc() },
+            JMP_TYPE::P => if !self.flags.n() && !self.flags.z() { self.jmp(little_endian!(ll, hh)) } else { self.inc_pc() },
+            JMP_TYPE::A => if !self.flags.c() && !self.flags.z() { self.jmp(little_endian!(ll, hh)) } else { self.inc_pc() },
+            JMP_TYPE::AE => if !self.flags.c() { self.jmp(little_endian!(ll, hh)) } else { self.inc_pc() },
+            JMP_TYPE::B => if self.flags.c() { self.jmp(little_endian!(ll, hh)) } else { self.inc_pc() },
+            JMP_TYPE::BE => if self.flags.c() || self.flags.z() { self.jmp(little_endian!(ll, hh)) } else { self.inc_pc() },
+            JMP_TYPE::LE => if self.flags.z() || (self.flags.n() != self.flags.o()) { self.jmp(little_endian!(ll, hh)) } else { self.inc_pc() },
+            JMP_TYPE::GE => if self.flags.n() == self.flags.o() { self.jmp(little_endian!(ll, hh)) } else { self.inc_pc() },
         }
     }
 
@@ -253,6 +269,11 @@ impl Cpu {
         self.inc_pc();
     }
 
+    fn and_xyz(&mut self, x: u8, y: u8, z: u8) {
+        self.r[z as usize] = self.and_op(self.r[x as usize], self.r[y as usize]);
+        self.inc_pc();
+    }
+
     fn sub_op(&mut self, a: i16, b: i16) -> i16 {
         let sub = a.wrapping_sub(b);
 
@@ -318,6 +339,11 @@ impl Cpu {
 
     fn div_xy(&mut self, x: u8, y: u8) {
         self.r[x as usize] = self.div_op(self.r[x as usize], self.r[y as usize]);
+        self.inc_pc();
+    }
+
+    fn divi(&mut self, x: u8, ll: u8, hh: u8) {
+        self.r[x as usize] = self.div_op(self.r[x as usize], little_endian!(ll, hh) as i16);
         self.inc_pc();
     }
 
@@ -403,6 +429,11 @@ impl Cpu {
         self.inc_pc();
     }
 
+    fn xor_xyz(&mut self, x: u8, y: u8, z: u8) {
+        self.r[z as usize] = self.xor_op(self.r[x as usize], self.r[y as usize]);
+        self.inc_pc();
+    }
+
     fn or_op(&mut self, a: i16, b: i16) -> i16 {
         let or = a | b;
 
@@ -432,7 +463,11 @@ impl Cpu {
     fn pop(&mut self, x: u8, mem: &mut Memory) {
         self.dec_sp();
         let addr = self.sp as usize;
-        self.r[x as usize] = (((mem[addr + 1] as u16) << 8) | mem[addr] as u16) as i16;
+
+        let ll = mem[addr];
+        let hh = mem[addr + 1];
+
+        self.r[x as usize] = little_endian!(ll, hh) as i16;
         self.inc_pc();
     }
 
@@ -441,7 +476,7 @@ impl Cpu {
         let val = self.r[x as usize] as u16;
 
         mem[addr] = (val & 0x00ff) as u8;
-        mem[addr + 1] = (val & 0xff00 >> 8) as u8;
+        mem[addr + 1] = ((val & 0xff00) >> 8) as u8;
 
         self.inc_sp();
         self.inc_pc();
@@ -462,7 +497,6 @@ impl Cpu {
     }
 
     fn sar(&mut self, x: u8, n: u8) {
-        let old = self.r[x as usize];
         let new = self.shr_op(self.r[x as usize], n) as u16;
         self.r[x as usize] = (new | (new & 0x8000)) as i16;
         self.inc_pc()
@@ -568,6 +602,21 @@ mod tests {
     }
 
     #[test]
+    fn test_call() {
+        let mut cpu = Cpu::default();
+        cpu.pc = 0xffee;
+        cpu.r[0] = -8531;
+
+        let mut mem = Memory::default();
+        cpu.call(0, &mut mem);
+
+        assert_eq!(cpu.pc, 0xdead);
+        assert_eq!(cpu.sp, (0xfdf0 + STACK_ENTRY_SIZE) as u16);
+        assert_eq!(mem[0xfdf0], 0xee);
+        assert_eq!(mem[0xfdf1], 0xff);
+    }
+
+    #[test]
     fn test_call_ret() {
         let mut cpu = Cpu::default();
         cpu.pc = 0xffee;
@@ -585,7 +634,7 @@ mod tests {
         let mut cpu = Cpu::default();
 
         cpu.pc = 0xffee;
-        cpu.jmp(0xad, 0xde);
+        cpu.jmp(0xdead);
 
         assert_eq!(cpu.pc, 0xdead);
     }
@@ -763,6 +812,18 @@ mod tests {
         assert!(cpu.flags.n());
         assert!(cpu.flags.c());
         assert!(cpu.flags.o());
+
+        cpu.r[0] = 0;
+        cpu.subi(0, 0, 0x0);
+        assert!(cpu.flags.z());
+    }
+
+    #[test]
+    fn test_cmpi() {
+        let mut cpu = Cpu::default();
+        cpu.r[0] = 0;
+        cpu.cmpi(0, 0, 0x0);
+        assert!(cpu.flags.z());
     }
 
     #[test]
@@ -929,6 +990,17 @@ mod tests {
 
         cpu.push(0, &mut mem);
         assert_eq!(mem[cpu.sp as usize - STACK_ENTRY_SIZE], 42);
+
+        cpu.r[0] = 3;
+        cpu.push(0, &mut mem);
+        assert_eq!(mem[cpu.sp as usize - STACK_ENTRY_SIZE], 3);
+        assert_eq!(mem[cpu.sp as usize - STACK_ENTRY_SIZE + 1], 0);
+
+        cpu.r[0] = 3;
+        cpu.r[1] = 0;
+        cpu.push(0, &mut mem);
+        cpu.pop(1, &mut mem);
+        assert_eq!(cpu.r[1], 3);
     }
 
     #[test]

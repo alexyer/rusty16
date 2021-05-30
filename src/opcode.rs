@@ -1,6 +1,6 @@
 use std::fmt;
 enum_from_primitive! {
-    #[derive(Debug)]
+    #[derive(Debug, PartialOrd, PartialEq)]
     pub enum Opcode {
         // 0x - Misc/Video/Audio
         NOP = 0x00,
@@ -22,6 +22,7 @@ enum_from_primitive! {
         JME = 0x13,
         CALL_HHLL = 0x14,
         RET = 0x15,
+        CALL = 0x18,
 
         // 2x - Loads
         LDI = 0x20,
@@ -48,6 +49,7 @@ enum_from_primitive! {
         // 6x - Bitwise AND (&)
         ANDI = 0x60,
         AND_XY = 0x61,
+        AND_XYZ = 0x62,
         TSTI = 0x63,
         TST = 0x64,
 
@@ -57,6 +59,7 @@ enum_from_primitive! {
 
         // 8x - Bitwise XOR (^)
         XOR_XY = 0x81,
+        XOR_XYZ = 0x82,
 
         // 9x - Multiplication
         MULI = 0x90,
@@ -64,6 +67,7 @@ enum_from_primitive! {
         MUL_XYZ = 0x92,
 
         // Ax - Division
+        DIVI = 0xa0,
         DIV_XY = 0xa1,
 
         // Bx - Logical/Arithmetic Shifts
@@ -76,6 +80,9 @@ enum_from_primitive! {
         PUSH = 0xc0,
         POP = 0xc1,
         PUSHF = 0xc4,
+
+        // Dx - Palette
+        PAL = 0xd0,
     }
 }
 
@@ -94,6 +101,9 @@ enum_from_primitive! {
     pub enum JMP_TYPE {
         Z = 0x0,
         NZ = 0x1,
+        N = 0x2,
+        NN = 0x3,
+        P = 0x4,
         A = 0x7,
         AE = 0x8,
         B = 0x9,

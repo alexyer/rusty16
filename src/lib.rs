@@ -5,8 +5,7 @@ extern crate enum_primitive;
 extern crate sdl2;
 use log::info;
 use crate::surface::SdlSurface;
-use std::{thread, time};
-use std::time::Duration;
+use std::time;
 
 #[macro_use]
 mod macros;
@@ -67,8 +66,6 @@ impl<'a> Rusty16<'a> {
                 self.screen.poll_events();
                 self.screen.update_frame();
             }
-            // let mut s = String::new();
-            // stdin().read_line(&mut s).unwrap();
         }
 
     }

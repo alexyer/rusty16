@@ -1,11 +1,7 @@
 use sdl2::{pixels, EventPump};
 use sdl2::render::{WindowCanvas, Texture, TextureCreator, TextureAccess};
 use crate::screen::{SCREEN_WIDTH, SCREEN_HEIGHT};
-use enum_primitive::FromPrimitive;
-use sdl2::rect::{Point, Rect};
-use sdl2::pixels::{PixelFormat, PixelFormatEnum};
-use std::borrow::Borrow;
-use sdl2::video::WindowContext;
+use sdl2::pixels::PixelFormatEnum;
 use std::cell::RefCell;
 use sdl2::event::EventType;
 
@@ -15,15 +11,13 @@ pub trait Surface {
     fn init(&mut self);
     fn cls(&mut self, bg: &Color);
     fn poll_events(&mut self);
-    fn present(&mut self, buffer: &[[u8; SCREEN_WIDTH]; SCREEN_HEIGHT]);
+    fn present(&mut self, new_buffer: &[[u8; SCREEN_WIDTH]; SCREEN_HEIGHT]);
 }
 
 pub struct TestSurface;
 pub struct SdlSurface{
     canvas: WindowCanvas,
     events: EventPump,
-    buffer: Vec<u32>,
-    creator: TextureCreator<sdl2::video::WindowContext>,
     texture: RefCell<Texture<'static>>,
 }
 
@@ -32,9 +26,9 @@ impl Surface for TestSurface {
         TestSurface {}
     }
     fn init(&mut self) {}
-    fn cls(&mut self, bg: &Color) {}
+    fn cls(&mut self, _bg: &Color) {}
     fn poll_events(&mut self) {}
-    fn present(&mut self, buffer: &[[u8; SCREEN_WIDTH]; SCREEN_HEIGHT]) {}
+    fn present(&mut self, _new_buffer: &[[u8; SCREEN_WIDTH]; SCREEN_HEIGHT]) {}
 }
 
 impl Surface for SdlSurface {
@@ -55,7 +49,7 @@ impl Surface for SdlSurface {
             .build()
             .map_err(|e| e.to_string()).unwrap();
 
-        let mut canvas = window
+        let canvas = window
             .into_canvas()
             .accelerated()
             .build()
@@ -78,8 +72,6 @@ impl Surface for SdlSurface {
         SdlSurface {
             canvas,
             events,
-            buffer: vec![0; SCREEN_WIDTH * SCREEN_HEIGHT * 4],
-            creator,
             texture: RefCell::new(texture),
         }
     }
@@ -119,10 +111,10 @@ impl Surface for SdlSurface {
                    buffer[offset + 3] = a;
                }
            }
-        });
+        }).unwrap();
 
         self.canvas.clear();
-        self.canvas.copy(&texture, None, None);
+        self.canvas.copy(&texture, None, None).unwrap();
         self.canvas.present();
     }
 }

@@ -1,7 +1,5 @@
 use crate::surface::{Surface, Color};
 use crate::memory::Memory;
-use enum_primitive::FromPrimitive;
-use std::panic::panic_any;
 
 pub const SCREEN_WIDTH: usize = 320;
 pub const SCREEN_HEIGHT: usize = 240;
